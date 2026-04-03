@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Spare Part Control – SMT</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#0d1117;--bg2:#161b22;--bg3:#21262d;
+  --border:#30363d;--border2:#3d444d;
+  --text:#e6edf3;--text2:#8b949e;--text3:#656d76;
+  --accent:#1f6feb;--accent2:#388bfd;
+  --green:#3fb950;--green-bg:#0d4429;
+  --yellow:#d29922;--yellow-bg:#3a2500;
+  --red:#f85149;--red-bg:#3d1a1a;
+  --blue:#58a6ff;--blue-bg:#0c2d6b;
+  --orange:#e3b341;--orange-bg:#341a00;
+  --mono:'IBM Plex Mono',monospace;
+  --sans:'IBM Plex Sans',sans-serif;
+  --r:6px;--r2:10px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh}
+
+/* HEADER */
+header{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 20px;display:flex;align-items:center;gap:12px;height:52px;position:sticky;top:0;z-index:100}
+.logo{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px}
+.logo-badge{background:var(--accent);color:#fff;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600}
+.spacer{flex:1}
+.sync-status{display:flex;align-items:center;gap:6px;font-size:11px;font-family:var(--mono);color:var(--text3);cursor:pointer;padding:5px 10px;border-radius:var(--r);border:1px solid var(--border);background:var(--bg3);transition:border-color .15s}
+.sync-status:hover{border-color:var(--border2)}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--text3);flex-shrink:0}
+.sync-dot.ok{background:var(--green)}
+.sync-dot.err{background:var(--red)}
+.sync-dot.spin{background:var(--yellow);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* CONTAINER */
+.container{max-width:1440px;margin:0 auto;padding:20px}
+
+/* SETUP BANNER */
+.setup-banner{background:linear-gradient(135deg,#0c2d6b,#1a1a2e);border:1px solid var(--accent);border-radius:var(--r2);padding:20px 24px;margin-bottom:20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.setup-banner-icon{font-size:28px;flex-shrink:0}
+.setup-banner-text{flex:1}
+.setup-banner-title{font-size:14px;font-weight:600;color:var(--blue);margin-bottom:4px}
+.setup-banner-sub{font-size:12px;color:var(--text2);line-height:1.5}
+.setup-input-row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.setup-input-row input{flex:1;min-width:200px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);padding:8px 12px;font-family:var(--mono);font-size:12px;outline:none}
+.setup-input-row input:focus{border-color:var(--accent2)}
+.setup-input-row input::placeholder{color:var(--text3)}
+
+/* TABS */
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:20px}
+.tab{padding:10px 18px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;user-select:none}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--text);border-bottom-color:var(--accent2)}
+
+/* KPIs */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px}
+.kpi-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:12px 16px}
+.kpi-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px}
+.kpi-value{font-family:var(--mono);font-size:24px;font-weight:600}
+.kpi-sub{font-size:10px;color:var(--text3);margin-top:2px}
+.kv-total{color:var(--blue)}.kv-disp{color:var(--green)}.kv-uso{color:var(--yellow)}
+.kv-trans{color:var(--blue)}.kv-danada{color:var(--red)}.kv-jal{color:var(--orange)}
+
+/* DASH ROW */
+.dash-row{display:grid;grid-template-columns:1fr 270px;gap:14px;margin-bottom:18px;align-items:start}
+@media(max-width:860px){.dash-row{grid-template-columns:1fr}}
+
+/* DONUT */
+.donut-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:16px;display:flex;flex-direction:column;align-items:center;gap:10px}
+.donut-title{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;align-self:flex-start}
+.donut-wrap{position:relative;width:130px;height:130px}
+.donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
+.donut-total{font-family:var(--mono);font-size:20px;font-weight:600}
+.donut-lbl{font-size:10px;color:var(--text3)}
+.donut-legend{width:100%;display:flex;flex-direction:column;gap:5px}
+.legend-row{display:flex;align-items:center;gap:6px;font-size:11px}
+.legend-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.legend-name{color:var(--text2);flex:1}
+.legend-val{font-family:var(--mono);color:var(--text);font-weight:600}
+
+/* ALERTS */
+.alert-area{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.alert{padding:9px 12px;border-radius:var(--r);font-size:12px;display:flex;gap:8px;align-items:flex-start}
+.alert-warn{background:var(--yellow-bg);border:1px solid #5a3d00;color:var(--yellow)}
+.alert-red{background:var(--red-bg);border:1px solid #5a1a1a;color:var(--red)}
+.alert-info{background:var(--blue-bg);border:1px solid #1f4080;color:var(--blue)}
+.alert-green{background:var(--green-bg);border:1px solid #1a5a1a;color:var(--green)}
+
+/* IMPORT ZONE */
+.import-zone{background:var(--bg2);border:1px dashed var(--border2);border-radius:var(--r2);padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;cursor:pointer;transition:border-color .2s,background .2s}
+.import-zone:hover,.import-zone.dragover{border-color:var(--accent2);background:rgba(31,111,235,.06)}
+.import-zone-icon{font-size:20px}
+.import-zone-text{flex:1}
+.import-zone-title{font-size:13px;font-weight:500}
+.import-zone-sub{font-size:11px;color:var(--text3);margin-top:1px}
+
+/* TOOLBAR */
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.toolbar input,.toolbar select{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);color:var(--text);padding:7px 11px;font-family:var(--sans);font-size:13px;outline:none;transition:border-color .15s}
+.toolbar input:focus,.toolbar select:focus{border-color:var(--accent2)}
+.toolbar input{width:200px}
+
+/* BUTTONS */
+button{font-family:var(--sans);font-size:13px;font-weight:500;border:none;border-radius:var(--r);padding:7px 14px;cursor:pointer;transition:all .15s}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:var(--accent2)}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text2)}.btn-ghost:hover{border-color:var(--border2);color:var(--text)}
+.btn-green{background:var(--green-bg);border:1px solid #1a5a1a;color:var(--green)}.btn-green:hover{background:#174d17}
+.btn-danger{background:transparent;border:1px solid var(--red-bg);color:var(--red);padding:4px 9px;font-size:12px}.btn-danger:hover{background:var(--red-bg)}
+.btn-sm{padding:4px 9px;font-size:12px;background:var(--bg3);border:1px solid var(--border);color:var(--text2)}.btn-sm:hover{color:var(--text);border-color:var(--border2)}
+
+/* TABLE */
+.table-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{background:var(--bg3);color:var(--text3);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;padding:9px 12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;position:sticky;top:0}
+thead th:hover{color:var(--text)}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:var(--bg3)}
+tbody td{padding:9px 12px;color:var(--text);vertical-align:middle;white-space:nowrap}
+td.mono{font-family:var(--mono);font-size:11px}
+td.wrap{white-space:normal;max-width:180px;color:var(--text2)}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.badge::before{content:'';width:5px;height:5px;border-radius:50%}
+.badge-disp{background:var(--green-bg);color:var(--green)}.badge-disp::before{background:var(--green)}
+.badge-uso{background:var(--yellow-bg);color:var(--yellow)}.badge-uso::before{background:var(--yellow)}
+.badge-trans{background:var(--blue-bg);color:var(--blue)}.badge-trans::before{background:var(--blue)}
+.badge-danada{background:var(--red-bg);color:var(--red)}.badge-danada::before{background:var(--red)}
+
+/* QTY INPUT */
+.qty-input{width:52px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);text-align:center;padding:3px 4px;font-family:var(--mono);font-size:12px;outline:none;transition:border-color .15s}
+.qty-input:focus{border-color:var(--accent2)}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:200;opacity:0;pointer-events:none;transition:opacity .2s;padding:16px}
+.modal-overlay.open{opacity:1;pointer-events:all}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:12px;width:100%;max-width:700px;max-height:92vh;overflow-y:auto;transform:translateY(14px);transition:transform .2s}
+.modal-overlay.open .modal{transform:translateY(0)}
+.modal-header{padding:18px 22px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-size:15px;font-weight:600}
+.modal-close{background:transparent;border:none;color:var(--text2);font-size:20px;cursor:pointer;line-height:1}.modal-close:hover{color:var(--text)}
+.modal-body{padding:18px 22px}
+.modal-footer{padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+
+/* FORM */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-group{display:flex;flex-direction:column;gap:4px}
+.form-group.full{grid-column:1/-1}
+.form-group label{font-size:11px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:.4px}
+.form-group input,.form-group select,.form-group textarea{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);padding:7px 10px;font-family:var(--sans);font-size:13px;outline:none;transition:border-color .15s;width:100%}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--accent2)}
+.form-group textarea{resize:vertical;min-height:65px}
+.form-section{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border);padding-bottom:5px;grid-column:1/-1}
+
+/* HISTORIAL */
+.hist-item{display:flex;gap:12px;padding:11px 18px;border-bottom:1px solid var(--border)}
+.hist-item:last-child{border-bottom:none}
+.hist-dot{width:9px;height:9px;border-radius:50%;margin-top:4px;flex-shrink:0}
+.hist-event{font-size:13px;font-weight:500}
+.hist-meta{font-size:11px;color:var(--text3);margin-top:2px;font-family:var(--mono)}
+.hist-detail{font-size:12px;color:var(--text2);margin-top:3px}
+
+/* DETAIL */
+.detail-row{display:flex;gap:8px;margin-bottom:9px;align-items:flex-start}
+.detail-label{font-size:11px;color:var(--text3);min-width:150px;padding-top:1px}
+.detail-value{font-size:13px}
+
+/* MISC */
+.empty-state{text-align:center;padding:50px 20px;color:var(--text3)}
+.empty-state .icon{font-size:36px;margin-bottom:10px}
+.import-option{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);padding:12px 16px;cursor:pointer;transition:all .15s;display:flex;gap:10px;align-items:center;margin-bottom:8px}
+.import-option:hover{border-color:var(--border2)}
+.import-option.selected{border-color:var(--accent2);background:rgba(31,111,235,.1)}
+.import-option-icon{font-size:18px}
+.import-option-title{font-size:13px;font-weight:600}
+.import-option-sub{font-size:11px;color:var(--text3);margin-top:1px}
+
+/* TOAST */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r2);padding:11px 16px;font-size:13px;z-index:999;opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none;max-width:340px}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.ok{border-left:3px solid var(--green)}
+.toast.err{border-left:3px solid var(--red)}
+.toast.warn{border-left:3px solid var(--yellow)}
+
+@media(max-width:600px){
+  .form-grid{grid-template-columns:1fr}
+  .kpi-grid{grid-template-columns:repeat(2,1fr)}
+  .toolbar input{width:100%}
+  .setup-input-row{flex-direction:column}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⚙ SPARE PART CONTROL <span class="logo-badge">SMT</span></div>
+  <div class="spacer"></div>
+  <div class="sync-status" id="syncStatus" onclick="openModalConfig()" title="Configurar Google Sheets">
+    <div class="sync-dot" id="syncDot"></div>
+    <span id="syncLabel">Sin conexión</span>
+  </div>
+  <div style="font-size:11px;color:var(--text3);font-family:var(--mono)" id="headerDate"></div>
+</header>
+
+<div class="container">
+
+  <!-- SETUP BANNER (visible solo si no hay URL configurada) -->
+  <div class="setup-banner" id="setupBanner" style="display:none">
+    <div class="setup-banner-icon">☁️</div>
+    <div class="setup-banner-text">
+      <div class="setup-banner-title">Conecta Google Sheets para sincronizar entre dispositivos</div>
+      <div class="setup-banner-sub">Pega la URL de tu Google Apps Script Web App para que los datos se guarden en la nube y estén disponibles en cualquier dispositivo.</div>
+      <div class="setup-input-row">
+        <input id="bannerUrl" placeholder="https://script.google.com/macros/s/.../exec"/>
+        <button class="btn-green" onclick="saveUrlFromBanner()">✓ Conectar</button>
+        <button class="btn-ghost" onclick="document.getElementById('setupBanner').style.display='none'">Ahora no</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="inventario">📦 Inventario</div>
+    <div class="tab" data-tab="historial">📋 Historial</div>
+    <div class="tab" data-tab="catalogo">🔧 Catálogo</div>
+  </div>
+
+  <!-- INVENTARIO -->
+  <div id="tab-inventario" class="tab-content">
+    <div class="kpi-grid" id="kpiGrid"></div>
+    <div class="dash-row">
+      <div>
+        <div class="alert-area" id="alertArea"></div>
+        <div class="import-zone" id="importZone" onclick="document.getElementById('xlsxInput').click()">
+          <div class="import-zone-icon">📂</div>
+          <div class="import-zone-text">
+            <div class="import-zone-title">Importar desde Excel (.xlsx)</div>
+            <div class="import-zone-sub">Haz clic o arrastra · Usa la plantilla descargable para mejores resultados</div>
+          </div>
+          <input type="file" id="xlsxInput" accept=".xlsx,.xls" style="display:none"/>
+          <button class="btn-ghost" style="pointer-events:none">📥 Seleccionar</button>
+        </div>
+      </div>
+      <div class="donut-card">
+        <div class="donut-title">Distribución por Estado</div>
+        <div class="donut-wrap">
+          <canvas id="donutCanvas" width="130" height="130"></canvas>
+          <div class="donut-center">
+            <span class="donut-total" id="donutTotal">0</span>
+            <span class="donut-lbl">piezas</span>
+          </div>
+        </div>
+        <div class="donut-legend" id="donutLegend"></div>
+      </div>
+    </div>
+    <div class="toolbar">
+      <input type="text" id="searchInv" placeholder="🔍  Buscar PN, SN, descripción..."/>
+      <select id="filterEstado">
+        <option value="">Todos los estados</option>
+        <option>Disponible</option><option>En uso</option>
+        <option>En tránsito</option><option>Dañada</option>
+      </select>
+      <select id="filterUbic">
+        <option value="">Todas las ubicaciones</option>
+        <option>NL</option><option>Jalisco</option><option>En tránsito</option>
+      </select>
+      <select id="filterPN"><option value="">Todos los PN</option></select>
+      <div class="spacer"></div>
+      <button class="btn-primary" onclick="openModal('new')">＋ Nueva Pieza</button>
+      <button class="btn-ghost" onclick="exportCSV('inv')">⬇ CSV</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th onclick="sortBy('pn')">Part Number ↕</th>
+          <th onclick="sortBy('sn')">Serial N.</th>
+          <th onclick="sortBy('desc')">Descripción</th>
+          <th onclick="sortBy('ubic')">Ubicación</th>
+          <th onclick="sortBy('estado')">Estado</th>
+          <th title="Cantidad disponible de este PN">Cantidad</th>
+          <th onclick="sortBy('llegada')">Llegada NL</th>
+          <th onclick="sortBy('uso')">Fecha Uso</th>
+          <th onclick="sortBy('envioJal')">Envío JAL</th>
+          <th>OS</th>
+          <th>Guía MTY→JAL</th>
+          <th>Guía JAL→MTY</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="invBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- HISTORIAL -->
+  <div id="tab-historial" class="tab-content" style="display:none">
+    <div class="toolbar">
+      <input type="text" id="searchHist" placeholder="🔍  Buscar..."/>
+      <select id="filterHistPN"><option value="">Todos los PN</option></select>
+      <select id="filterHistEvento">
+        <option value="">Todos los eventos</option>
+        <option>Recepción en NL</option><option>Asignación a Orden</option>
+        <option>Instalación en Equipo</option><option>Extracción de Equipo (Dañada)</option>
+        <option>Envío MTY→JAL</option><option>Recepción en JAL</option>
+        <option>Envío JAL→MTY</option><option>Baja / Descarte</option>
+      </select>
+      <div class="spacer"></div>
+      <button class="btn-ghost" onclick="exportCSV('hist')">⬇ CSV</button>
+      <button class="btn-primary" onclick="openModalHist()">＋ Registrar Movimiento</button>
+    </div>
+    <div class="table-wrap" style="max-height:580px;overflow-y:auto">
+      <div id="histList"></div>
+    </div>
+  </div>
+
+  <!-- CATÁLOGO -->
+  <div id="tab-catalogo" class="tab-content" style="display:none">
+    <div class="toolbar">
+      <input type="text" id="searchCat" placeholder="🔍  Buscar..."/>
+      <div class="spacer"></div>
+      <button class="btn-primary" onclick="openModalCat()">＋ Agregar al Catálogo</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Part Number</th><th>Descripción</th><th>Fabricante</th>
+          <th>Equipo Compatible</th><th>S/N</th>
+          <th title="Stock mínimo recomendado en NL">Mín. NL</th>
+          <th title="Piezas Disponibles en inventario">Disponibles</th>
+          <th>Notas</th><th></th>
+        </tr></thead>
+        <tbody id="catBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PIEZA -->
+<div class="modal-overlay" id="modalInv">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modalInvTitle">Nueva Pieza</span>
+      <button class="modal-close" onclick="closeModal('modalInv')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-section">Identificación</div>
+        <div class="form-group"><label>Part Number *</label><input id="f_pn" placeholder="SMT-XXX-000"/></div>
+        <div class="form-group"><label>Serial Number</label><input id="f_sn" placeholder="N/A si no aplica"/></div>
+        <div class="form-group full"><label>Descripción *</label><input id="f_desc"/></div>
+        <div class="form-section">Estado y Ubicación</div>
+        <div class="form-group"><label>Ubicación *</label>
+          <select id="f_ubic"><option>NL</option><option>Jalisco</option><option>En tránsito</option></select></div>
+        <div class="form-group"><label>Estado *</label>
+          <select id="f_estado"><option>Disponible</option><option>En uso</option><option>En tránsito</option><option>Dañada</option></select></div>
+        <div class="form-group"><label>Cantidad</label>
+          <input id="f_cantidad" type="number" min="0" value="1"/></div>
+        <div class="form-section">Fechas</div>
+        <div class="form-group"><label>Fecha Llegada NL</label><input id="f_llegada" type="date"/></div>
+        <div class="form-group"><label>Fecha Uso / Instalación</label><input id="f_uso" type="date"/></div>
+        <div class="form-group"><label>Fecha Envío a Jalisco</label><input id="f_envioJal" type="date"/></div>
+        <div class="form-section">Guías de Envío</div>
+        <div class="form-group"><label>Guía MTY → JAL</label><input id="f_guiaMTY"/></div>
+        <div class="form-group"><label>Guía JAL → MTY</label><input id="f_guiaJAL"/></div>
+        <div class="form-section">Orden de Servicio</div>
+        <div class="form-group"><label>Orden de Servicio</label><input id="f_os" placeholder="OS-2025-XXXX"/></div>
+        <div class="form-group"><label>Empresa Cliente</label><input id="f_empresa"/></div>
+        <div class="form-group"><label>Máquina / Equipo</label><input id="f_maquina"/></div>
+        <div class="form-group"><label>Ingeniero Responsable</label><input id="f_ing"/></div>
+        <div class="form-group full"><label>Notas</label><textarea id="f_notas"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('modalInv')">Cancelar</button>
+      <button class="btn-primary" onclick="savePieza()">Guardar Pieza</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL HISTORIAL -->
+<div class="modal-overlay" id="modalHist">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Registrar Movimiento</span>
+      <button class="modal-close" onclick="closeModal('modalHist')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>Fecha *</label><input id="h_fecha" type="date"/></div>
+        <div class="form-group"><label>Part Number *</label><select id="h_pn"></select></div>
+        <div class="form-group"><label>Serial Number</label><input id="h_sn"/></div>
+        <div class="form-group"><label>Evento *</label>
+          <select id="h_evento">
+            <option>Recepción en NL</option><option>Asignación a Orden</option>
+            <option>Instalación en Equipo</option><option>Extracción de Equipo (Dañada)</option>
+            <option>Envío MTY→JAL</option><option>Recepción en JAL</option>
+            <option>Envío JAL→MTY</option><option>Baja / Descarte</option>
+          </select></div>
+        <div class="form-group"><label>Orden de Servicio</label><input id="h_os" placeholder="OS-2025-XXXX"/></div>
+        <div class="form-group"><label>Guía de Envío</label><input id="h_guia"/></div>
+        <div class="form-group"><label>Empresa Cliente</label><input id="h_empresa"/></div>
+        <div class="form-group"><label>Máquina / Equipo</label><input id="h_maquina"/></div>
+        <div class="form-group"><label>Origen</label>
+          <select id="h_origen"><option>NL</option><option>Jalisco</option><option>Cliente</option></select></div>
+        <div class="form-group"><label>Destino</label>
+          <select id="h_destino"><option>NL</option><option>Jalisco</option><option>Cliente</option></select></div>
+        <div class="form-group"><label>Ingeniero</label><input id="h_ing"/></div>
+        <div class="form-group full"><label>Notas</label><textarea id="h_notas" style="min-height:55px"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('modalHist')">Cancelar</button>
+      <button class="btn-primary" onclick="saveMovimiento()">Registrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CATÁLOGO -->
+<div class="modal-overlay" id="modalCat">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <span class="modal-title">Agregar al Catálogo</span>
+      <button class="modal-close" onclick="closeModal('modalCat')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>Part Number *</label><input id="c_pn"/></div>
+        <div class="form-group"><label>Fabricante</label><input id="c_fab"/></div>
+        <div class="form-group full"><label>Descripción *</label><input id="c_desc"/></div>
+        <div class="form-group full"><label>Equipo Compatible</label><input id="c_equipo"/></div>
+        <div class="form-group"><label>Requiere S/N</label>
+          <select id="c_sn"><option>Sí</option><option>No</option></select></div>
+        <div class="form-group"><label>Stock Mínimo NL</label>
+          <input id="c_stock" type="number" min="0" value="1"/></div>
+        <div class="form-group full"><label>Notas</label>
+          <textarea id="c_notas" style="min-height:55px"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('modalCat')">Cancelar</button>
+      <button class="btn-primary" onclick="saveCatalogo()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DETALLE -->
+<div class="modal-overlay" id="modalDetalle">
+  <div class="modal" style="max-width:580px">
+    <div class="modal-header">
+      <span class="modal-title" id="detalleTitle">Detalle</span>
+      <button class="modal-close" onclick="closeModal('modalDetalle')">✕</button>
+    </div>
+    <div class="modal-body" id="detalleBody"></div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('modalDetalle')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL IMPORT EXCEL -->
+<div class="modal-overlay" id="modalImport">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <span class="modal-title">Importar desde Excel</span>
+      <button class="modal-close" onclick="closeModal('modalImport')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text2);margin-bottom:14px">
+        Archivo: <span id="importFileName" style="color:var(--blue);font-family:var(--mono)"></span>
+      </p>
+      <p style="font-size:12px;color:var(--text3);margin-bottom:8px">Selecciona la hoja a importar:</p>
+      <div id="importOptions"></div>
+      <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:6px">
+        <p style="font-size:12px;color:var(--text3);margin-bottom:8px">¿Qué hacer con los datos actuales?</p>
+        <div style="display:flex;gap:18px;flex-wrap:wrap">
+          <label style="display:flex;gap:6px;align-items:center;cursor:pointer;font-size:13px">
+            <input type="radio" name="importMode" value="merge" checked/> Fusionar</label>
+          <label style="display:flex;gap:6px;align-items:center;cursor:pointer;font-size:13px">
+            <input type="radio" name="importMode" value="replace"/> Reemplazar todo</label>
+        </div>
+      </div>
+      <div class="alert alert-info" style="margin-top:12px;font-size:11px">
+        ℹ Usa la plantilla <strong>Plantilla_Spare_Part_SMT.xlsx</strong> para garantizar compatibilidad de columnas.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('modalImport')">Cancelar</button>
+      <button class="btn-primary" onclick="doImport()">Importar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CONFIG GOOGLE SHEETS -->
+<div class="modal-overlay" id="modalConfig">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <span class="modal-title">☁️ Configuración de Sincronización</span>
+      <button class="modal-close" onclick="closeModal('modalConfig')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="alert alert-info" style="margin-bottom:16px;font-size:12px;line-height:1.6">
+        Para sincronizar entre dispositivos necesitas una <strong>Google Apps Script Web App URL</strong>.<br>
+        Sigue las instrucciones del chat para crearla en menos de 5 minutos.
+      </div>
+      <div class="form-group" style="margin-bottom:14px">
+        <label>URL de Google Apps Script Web App</label>
+        <input id="configUrl" placeholder="https://script.google.com/macros/s/.../exec" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);padding:8px 12px;font-family:var(--mono);font-size:12px;outline:none;width:100%"/>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+        <button class="btn-green" onclick="testAndSaveUrl()">🔗 Probar y Guardar</button>
+        <button class="btn-ghost" onclick="syncNow()">🔄 Sincronizar ahora</button>
+        <button class="btn-danger" onclick="clearUrl()" style="margin-left:auto">Desconectar</button>
+      </div>
+      <div id="configStatus" style="font-size:12px;color:var(--text3)"></div>
+      <hr style="border-color:var(--border);margin:16px 0"/>
+      <p style="font-size:12px;color:var(--text3);margin-bottom:8px">Estado de los datos en la nube:</p>
+      <div id="cloudDataStatus" style="font-size:12px;color:var(--text2)">—</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('modalConfig')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════════════════════
+let piezas = JSON.parse(localStorage.getItem('sp_piezas')||'null') || [
+  {id:1,pn:'SMT-CM-001',sn:'SN-20240101',desc:'Conveyor Motor',ubic:'NL',estado:'Disponible',cantidad:1,llegada:'2025-01-15',uso:'',envioJal:'',guiaMTY:'',guiaJAL:'GJL-2025-0042',os:'',empresa:'',maquina:'',ing:'',notas:'Stock inicial'},
+  {id:2,pn:'SMT-NZ-002',sn:'N/A',desc:'Nozzle Type A',ubic:'NL',estado:'Disponible',cantidad:3,llegada:'2025-01-20',uso:'',envioJal:'',guiaMTY:'',guiaJAL:'GJL-2025-0043',os:'',empresa:'',maquina:'',ing:'',notas:''},
+  {id:3,pn:'SMT-CB-003',sn:'SN-20240215',desc:'Control Board Main',ubic:'NL',estado:'En uso',cantidad:1,llegada:'2025-02-10',uso:'2025-03-15',envioJal:'',guiaMTY:'',guiaJAL:'GJL-2025-0055',os:'OS-2025-0089',empresa:'Empresa Ejemplo SA',maquina:'Fuji NXT #3',ing:'Ing. López',notas:'En reparación cliente'},
+  {id:4,pn:'SMT-FD-004',sn:'N/A',desc:'Feeder 8mm',ubic:'Jalisco',estado:'En tránsito',cantidad:2,llegada:'',uso:'',envioJal:'',guiaMTY:'',guiaJAL:'GJL-2025-0061',os:'',empresa:'',maquina:'',ing:'',notas:'Esperando envío de JAL'},
+  {id:5,pn:'SMT-CS-005',sn:'SN-20231105',desc:'Camera Sensor',ubic:'NL',estado:'Dañada',cantidad:1,llegada:'2023-11-05',uso:'2025-01-12',envioJal:'2025-03-20',guiaMTY:'GNL-2025-0177',guiaJAL:'',os:'OS-2025-0102',empresa:'Empresa Demo SRL',maquina:'Yamaha YSM20',ing:'Ing. García',notas:'Enviada a JAL para reposición'},
+];
+let historial = JSON.parse(localStorage.getItem('sp_hist')||'null') || [
+  {id:1,fecha:'2025-01-15',pn:'SMT-CM-001',sn:'SN-20240101',evento:'Recepción en NL',os:'',guia:'GJL-2025-0042',empresa:'',maquina:'',origen:'Jalisco',destino:'NL',ing:'',notas:'Stock inicial'},
+  {id:2,fecha:'2025-02-10',pn:'SMT-CB-003',sn:'SN-20240215',evento:'Recepción en NL',os:'',guia:'GJL-2025-0055',empresa:'',maquina:'',origen:'Jalisco',destino:'NL',ing:'',notas:''},
+  {id:3,fecha:'2025-03-15',pn:'SMT-CB-003',sn:'SN-20240215',evento:'Asignación a Orden',os:'OS-2025-0089',guia:'',empresa:'Empresa Ejemplo SA',maquina:'Fuji NXT #3',origen:'NL',destino:'NL',ing:'Ing. López',notas:'Fallo en tarjeta principal'},
+  {id:4,fecha:'2025-03-20',pn:'SMT-CS-005',sn:'SN-20231105',evento:'Envío MTY→JAL',os:'OS-2025-0102',guia:'GNL-2025-0177',empresa:'Empresa Demo SRL',maquina:'Yamaha YSM20',origen:'NL',destino:'Jalisco',ing:'Ing. García',notas:'Enviada para reposición'},
+];
+let catalogo = JSON.parse(localStorage.getItem('sp_cat')||'null') || [
+  {pn:'SMT-CM-001',desc:'Conveyor Motor',fab:'Fuji',equipo:'NXT / XPF',sn:'Sí',stock:1,notas:'Motor de conveyor principal'},
+  {pn:'SMT-NZ-002',desc:'Nozzle Type A',fab:'Yamaha',equipo:'YSM20 / YSM10',sn:'No',stock:3,notas:'Boquilla estándar 0402'},
+  {pn:'SMT-CB-003',desc:'Control Board Main',fab:'Juki',equipo:'KE-3020',sn:'Sí',stock:1,notas:'Tarjeta de control principal'},
+  {pn:'SMT-FD-004',desc:'Feeder 8mm',fab:'Fuji',equipo:'NXT II',sn:'No',stock:2,notas:'Feeder 8mm estándar'},
+  {pn:'SMT-CS-005',desc:'Camera Sensor',fab:'Panasonic',equipo:'NPM',sn:'Sí',stock:1,notas:'Sensor de visión'},
+];
+
+function saveLocal(){
+  localStorage.setItem('sp_piezas',JSON.stringify(piezas));
+  localStorage.setItem('sp_hist',JSON.stringify(historial));
+  localStorage.setItem('sp_cat',JSON.stringify(catalogo));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GOOGLE SHEETS SYNC
+// ═══════════════════════════════════════════════════════════════
+let GS_URL = localStorage.getItem('gs_url') || '';
+
+function setSyncStatus(state, label){
+  const dot = document.getElementById('syncDot');
+  const lbl = document.getElementById('syncLabel');
+  dot.className = 'sync-dot' + (state ? ' '+state : '');
+  lbl.textContent = label;
+}
+
+// Fetch one sheet from Google Sheets via the Apps Script proxy
+async function gsGet(sheet){
+  const res = await fetch(`${GS_URL}?sheet=${encodeURIComponent(sheet)}`);
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  return res.json();
+}
+
+// Write all rows of one sheet
+async function gsPost(sheet, data){
+  const res = await fetch(GS_URL, {
+    method:'POST',
+    body: JSON.stringify({sheet, action:'save_all', data}),
+  });
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  return res.json();
+}
+
+// Map DB objects → rows using sheet headers
+// Inventario headers (must match Apps Script sheet exactly)
+const INV_HEADERS  = ['id','Part Number','Serial Number','Descripcion','Ubicacion','Estado','Cantidad','Llegada NL','Fecha Uso','Envio JAL','Guia MTY-JAL','Guia JAL-MTY','Orden de Servicio','Empresa','Maquina','Ingeniero','Notas'];
+const HIST_HEADERS = ['id','Fecha','Part Number','Serial Number','Evento','Orden de Servicio','Guia','Empresa','Maquina','Origen','Destino','Ingeniero','Notas'];
+const CAT_HEADERS  = ['pn','Descripcion','Fabricante','Equipo Compatible','Requiere SN','Stock Min NL','Notas'];
+
+function piezaToRow(p){ return {id:p.id,'Part Number':p.pn,'Serial Number':p.sn,'Descripcion':p.desc,'Ubicacion':p.ubic,'Estado':p.estado,'Cantidad':p.cantidad||0,'Llegada NL':p.llegada||'','Fecha Uso':p.uso||'','Envio JAL':p.envioJal||'','Guia MTY-JAL':p.guiaMTY||'','Guia JAL-MTY':p.guiaJAL||'','Orden de Servicio':p.os||'','Empresa':p.empresa||'','Maquina':p.maquina||'','Ingeniero':p.ing||'','Notas':p.notas||''}; }
+function histToRow(h){ return {id:h.id,'Fecha':h.fecha||'','Part Number':h.pn,'Serial Number':h.sn||'','Evento':h.evento||'','Orden de Servicio':h.os||'','Guia':h.guia||'','Empresa':h.empresa||'','Maquina':h.maquina||'','Origen':h.origen||'','Destino':h.destino||'','Ingeniero':h.ing||'','Notas':h.notas||''}; }
+function catToRow(c){ return {pn:c.pn,'Descripcion':c.desc||'','Fabricante':c.fab||'','Equipo Compatible':c.equipo||'','Requiere SN':c.sn||'No','Stock Min NL':c.stock||1,'Notas':c.notas||''}; }
+
+function rowToPieza(r){
+  return {id:Number(r['id'])||Date.now(),pn:r['Part Number']||'',sn:r['Serial Number']||'',desc:r['Descripcion']||'',ubic:r['Ubicacion']||'NL',estado:r['Estado']||'Disponible',cantidad:Number(r['Cantidad'])||0,llegada:r['Llegada NL']||'',uso:r['Fecha Uso']||'',envioJal:r['Envio JAL']||'',guiaMTY:r['Guia MTY-JAL']||'',guiaJAL:r['Guia JAL-MTY']||'',os:r['Orden de Servicio']||'',empresa:r['Empresa']||'',maquina:r['Maquina']||'',ing:r['Ingeniero']||'',notas:r['Notas']||''};
+}
+function rowToHist(r){
+  return {id:Number(r['id'])||Date.now(),fecha:r['Fecha']||'',pn:r['Part Number']||'',sn:r['Serial Number']||'',evento:r['Evento']||'',os:r['Orden de Servicio']||'',guia:r['Guia']||'',empresa:r['Empresa']||'',maquina:r['Maquina']||'',origen:r['Origen']||'',destino:r['Destino']||'',ing:r['Ingeniero']||'',notas:r['Notas']||''};
+}
+function rowToCat(r){
+  return {pn:r['pn']||'',desc:r['Descripcion']||'',fab:r['Fabricante']||'',equipo:r['Equipo Compatible']||'',sn:r['Requiere SN']||'No',stock:Number(r['Stock Min NL'])||1,notas:r['Notas']||''};
+}
+
+// Pull all 3 sheets from Google Sheets and update local state
+async function pullFromCloud(){
+  if(!GS_URL) return;
+  setSyncStatus('spin','Sincronizando...');
+  try{
+    const [invRows, histRows, catRows] = await Promise.all([
+      gsGet('Inventario'), gsGet('Historial'), gsGet('Catalogo')
+    ]);
+    if(Array.isArray(invRows)  && invRows.length)  piezas    = invRows.map(rowToPieza);
+    if(Array.isArray(histRows) && histRows.length) historial = histRows.map(rowToHist);
+    if(Array.isArray(catRows)  && catRows.length)  catalogo  = catRows.map(rowToCat);
+    saveLocal();
+    renderInv();
+    setSyncStatus('ok','Sincronizado');
+    toast('✅ Datos actualizados desde la nube.','ok');
+  }catch(e){
+    setSyncStatus('err','Error de conexión');
+    toast('❌ Error al leer Google Sheets: '+e.message,'err');
+  }
+}
+
+// Push all data to Google Sheets
+async function pushToCloud(){
+  if(!GS_URL) return;
+  setSyncStatus('spin','Guardando...');
+  try{
+    await Promise.all([
+      gsPost('Inventario', piezas.map(piezaToRow)),
+      gsPost('Historial',  historial.map(histToRow)),
+      gsPost('Catalogo',   catalogo.map(catToRow)),
+    ]);
+    setSyncStatus('ok','Sincronizado');
+  }catch(e){
+    setSyncStatus('err','Error al guardar');
+    toast('❌ Error al guardar en Google Sheets: '+e.message,'err');
+  }
+}
+
+// Save + sync to cloud
+function save(skipCloud){
+  saveLocal();
+  if(!skipCloud && GS_URL) pushToCloud();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONFIG MODAL
+// ═══════════════════════════════════════════════════════════════
+function openModalConfig(){
+  document.getElementById('configUrl').value = GS_URL;
+  document.getElementById('configStatus').textContent = GS_URL ? '✓ URL configurada' : 'Sin URL configurada';
+  const s = `Inventario: ${piezas.length} filas · Historial: ${historial.length} filas · Catálogo: ${catalogo.length} filas`;
+  document.getElementById('cloudDataStatus').textContent = s;
+  document.getElementById('modalConfig').classList.add('open');
+}
+
+async function testAndSaveUrl(){
+  const url = document.getElementById('configUrl').value.trim();
+  if(!url){toast('Pega la URL primero.','err');return;}
+  document.getElementById('configStatus').textContent = '⏳ Probando conexión...';
+  try{
+    const r = await fetch(`${url}?sheet=Inventario`);
+    const d = await r.json();
+    if(d.error) throw new Error(d.error);
+    GS_URL = url;
+    localStorage.setItem('gs_url', GS_URL);
+    document.getElementById('configStatus').textContent = '✅ Conexión exitosa. URL guardada.';
+    document.getElementById('setupBanner').style.display='none';
+    setSyncStatus('ok','Conectado');
+    toast('✅ Google Sheets conectado correctamente.','ok');
+    await pullFromCloud();
+  }catch(e){
+    document.getElementById('configStatus').textContent = '❌ Error: '+e.message;
+    toast('No se pudo conectar. Verifica la URL y los permisos del Web App.','err');
+  }
+}
+
+function syncNow(){ pullFromCloud(); closeModal('modalConfig'); }
+
+function clearUrl(){
+  if(!confirm('¿Desconectar Google Sheets? Los datos locales se conservan.'))return;
+  GS_URL=''; localStorage.removeItem('gs_url');
+  setSyncStatus('','Sin conexión');
+  document.getElementById('configStatus').textContent='Desconectado.';
+  toast('Desconectado de Google Sheets.','warn');
+}
+
+function saveUrlFromBanner(){
+  const url=document.getElementById('bannerUrl').value.trim();
+  if(!url){toast('Pega la URL primero.','err');return;}
+  document.getElementById('configUrl').value=url;
+  document.getElementById('setupBanner').style.display='none';
+  testAndSaveUrl();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════════════
+let _tt;
+function toast(msg,type='ok'){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.className=`toast show ${type}`;
+  clearTimeout(_tt); _tt=setTimeout(()=>el.classList.remove('show'),3500);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════════════════
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(x=>x.style.display='none');
+    t.classList.add('active');
+    document.getElementById('tab-'+t.dataset.tab).style.display='';
+    if(t.dataset.tab==='historial') renderHistorial();
+    if(t.dataset.tab==='catalogo') renderCatalogo();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════════
+function fmtDate(d){if(!d)return '—';const p=d.split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:d;}
+const SB={
+  'Disponible':'<span class="badge badge-disp">Disponible</span>',
+  'En uso':'<span class="badge badge-uso">En uso</span>',
+  'En tránsito':'<span class="badge badge-trans">En tránsito</span>',
+  'Dañada':'<span class="badge badge-danada">Dañada</span>',
+};
+function dispByPN(pn){return piezas.filter(p=>p.pn===pn&&p.estado==='Disponible').length;}
+function minStock(pn){const c=catalogo.find(x=>x.pn===pn);return c?c.stock:0;}
+
+function updateCantidad(id,val){
+  const p=piezas.find(x=>x.id===id);if(!p)return;
+  p.cantidad=Math.max(0,parseInt(val)||0);
+  save();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// KPIs + ALERTS + DONUT
+// ═══════════════════════════════════════════════════════════════
+function renderKPIs(){
+  const total=piezas.length;
+  const disp=piezas.filter(p=>p.estado==='Disponible').length;
+  const uso=piezas.filter(p=>p.estado==='En uso').length;
+  const trans=piezas.filter(p=>p.estado==='En tránsito').length;
+  const danada=piezas.filter(p=>p.estado==='Dañada').length;
+  const jal=piezas.filter(p=>p.ubic==='Jalisco').length;
+  const pnsU=[...new Set(piezas.map(p=>p.pn))].length;
+
+  document.getElementById('kpiGrid').innerHTML=[
+    {l:'Total Piezas',v:total,s:`${pnsU} PN distintos`,c:'kv-total'},
+    {l:'Disponibles en NL',v:disp,s:'',c:'kv-disp'},
+    {l:'En Uso',v:uso,s:'',c:'kv-uso'},
+    {l:'En Tránsito',v:trans,s:'',c:'kv-trans'},
+    {l:'Dañadas',v:danada,s:'Pendiente JAL',c:'kv-danada'},
+    {l:'En Jalisco',v:jal,s:'',c:'kv-jal'},
+  ].map(k=>`<div class="kpi-card"><div class="kpi-label">${k.l}</div><div class="kpi-value ${k.c}">${k.v}</div>${k.s?`<div class="kpi-sub">${k.s}</div>`:''}</div>`).join('');
+
+  const al=[];
+  const misOS=piezas.filter(p=>p.estado==='En uso'&&!p.os);
+  if(misOS.length) al.push({c:'alert-warn',m:`⚠ ${misOS.length} pieza(s) "En uso" sin Orden de Servicio.`});
+  const allPN=[...new Set(piezas.map(p=>p.pn))];
+  const agotados=allPN.filter(pn=>{const m=minStock(pn);return m&&dispByPN(pn)===0;});
+  const bajos=allPN.filter(pn=>{const m=minStock(pn),d=dispByPN(pn);return m&&d>0&&d<m;});
+  if(agotados.length) al.push({c:'alert-red',m:`🔴 Stock AGOTADO en NL: ${agotados.join(', ')}`});
+  if(bajos.length)    al.push({c:'alert-warn',m:`🟡 Stock BAJO en NL: ${bajos.join(', ')}`});
+  document.getElementById('alertArea').innerHTML=al.map(a=>`<div class="alert ${a.c}">${a.m}</div>`).join('');
+
+  const pnSel=document.getElementById('filterPN');
+  const cur=pnSel.value;
+  pnSel.innerHTML='<option value="">Todos los PN</option>'+allPN.sort().map(p=>`<option${p===cur?' selected':''}>${p}</option>`).join('');
+
+  drawDonut([disp,uso,trans,danada],
+    [{l:'Disponible',c:'#3fb950'},{l:'En uso',c:'#d29922'},{l:'En tránsito',c:'#58a6ff'},{l:'Dañada',c:'#f85149'}],
+    total);
+}
+
+function drawDonut(vals,defs,total){
+  const cv=document.getElementById('donutCanvas'),ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,130,130);
+  const sum=vals.reduce((a,b)=>a+b,0)||1;
+  let s=-Math.PI/2;
+  vals.forEach((v,i)=>{
+    const sw=(v/sum)*2*Math.PI;
+    ctx.beginPath();ctx.moveTo(65,65);ctx.arc(65,65,55,s,s+sw);ctx.closePath();
+    ctx.fillStyle=defs[i].c+(v===0?'22':'');ctx.fill();s+=sw;
+  });
+  ctx.beginPath();ctx.arc(65,65,37,0,2*Math.PI);ctx.fillStyle='#161b22';ctx.fill();
+  document.getElementById('donutTotal').textContent=total;
+  document.getElementById('donutLegend').innerHTML=defs.map((d,i)=>
+    `<div class="legend-row"><div class="legend-dot" style="background:${d.c}"></div><span class="legend-name">${d.l}</span><span class="legend-val">${vals[i]}</span></div>`
+  ).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INVENTARIO TABLE
+// ═══════════════════════════════════════════════════════════════
+let sortKey='',sortDir=1;
+function renderInv(){
+  renderKPIs();
+  const q=document.getElementById('searchInv').value.toLowerCase();
+  const fe=document.getElementById('filterEstado').value;
+  const fu=document.getElementById('filterUbic').value;
+  const fp=document.getElementById('filterPN').value;
+  let data=piezas.filter(p=>{
+    if(fe&&p.estado!==fe)return false;
+    if(fu&&p.ubic!==fu)return false;
+    if(fp&&p.pn!==fp)return false;
+    return !q||[p.pn,p.sn,p.desc,p.os,p.empresa].join(' ').toLowerCase().includes(q);
+  });
+  if(sortKey) data.sort((a,b)=>{const va=a[sortKey]||'',vb=b[sortKey]||'';return va<vb?-sortDir:va>vb?sortDir:0;});
+  const tb=document.getElementById('invBody');
+  if(!data.length){tb.innerHTML=`<tr><td colspan="13"><div class="empty-state"><div class="icon">📦</div><p>No hay piezas que coincidan.</p></div></td></tr>`;return;}
+  tb.innerHTML=data.map(p=>`<tr>
+    <td class="mono" style="color:var(--blue)">${p.pn}</td>
+    <td class="mono">${p.sn||'—'}</td>
+    <td>${p.desc}</td>
+    <td style="font-size:11px;color:var(--text2)">${p.ubic}</td>
+    <td>${SB[p.estado]||p.estado}</td>
+    <td style="text-align:center"><input class="qty-input" type="number" min="0" value="${p.cantidad||0}" onchange="updateCantidad(${p.id},this.value)"/></td>
+    <td style="color:var(--text3);font-size:11px">${fmtDate(p.llegada)}</td>
+    <td style="color:var(--text3);font-size:11px">${fmtDate(p.uso)}</td>
+    <td style="color:var(--text3);font-size:11px">${fmtDate(p.envioJal)}</td>
+    <td class="mono" style="color:${p.os?'var(--green)':'var(--text3)'}">${p.os||'—'}</td>
+    <td class="mono" style="font-size:11px">${p.guiaMTY||'—'}</td>
+    <td class="mono" style="font-size:11px">${p.guiaJAL||'—'}</td>
+    <td style="display:flex;gap:4px">
+      <button class="btn-sm" onclick="verDetalle(${p.id})">👁</button>
+      <button class="btn-sm" onclick="openModal(${p.id})">✏</button>
+      <button class="btn-danger" onclick="deletePieza(${p.id})">🗑</button>
+    </td>
+  </tr>`).join('');
+}
+function sortBy(k){if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=1;}renderInv();}
+['searchInv','filterEstado','filterUbic','filterPN'].forEach(id=>{
+  const el=document.getElementById(id);
+  el.addEventListener('input',renderInv);el.addEventListener('change',renderInv);
+});
+
+// ═══════════════════════════════════════════════════════════════
+// MODAL PIEZA
+// ═══════════════════════════════════════════════════════════════
+let editId=null;
+function openModal(id){
+  editId=id==='new'?null:id;
+  document.getElementById('modalInvTitle').textContent=editId?'Editar Pieza':'Nueva Pieza';
+  const F=['pn','sn','desc','ubic','estado','cantidad','llegada','uso','envioJal','guiaMTY','guiaJAL','os','empresa','maquina','ing','notas'];
+  F.forEach(f=>{const e=document.getElementById('f_'+f);if(e)e.value='';});
+  document.getElementById('f_ubic').value='NL';
+  document.getElementById('f_estado').value='Disponible';
+  document.getElementById('f_cantidad').value='1';
+  if(editId){const p=piezas.find(x=>x.id===editId);if(p)F.forEach(f=>{const e=document.getElementById('f_'+f);if(e)e.value=p[f]!==undefined?p[f]:'';});}
+  document.getElementById('modalInv').classList.add('open');
+}
+function savePieza(){
+  const pn=document.getElementById('f_pn').value.trim();
+  const desc=document.getElementById('f_desc').value.trim();
+  if(!pn||!desc){toast('Part Number y Descripción son obligatorios.','err');return;}
+  const o={
+    id:editId||Date.now(),pn,sn:document.getElementById('f_sn').value.trim(),desc,
+    ubic:document.getElementById('f_ubic').value,estado:document.getElementById('f_estado').value,
+    cantidad:parseInt(document.getElementById('f_cantidad').value)||0,
+    llegada:document.getElementById('f_llegada').value,uso:document.getElementById('f_uso').value,
+    envioJal:document.getElementById('f_envioJal').value,
+    guiaMTY:document.getElementById('f_guiaMTY').value.trim(),guiaJAL:document.getElementById('f_guiaJAL').value.trim(),
+    os:document.getElementById('f_os').value.trim(),empresa:document.getElementById('f_empresa').value.trim(),
+    maquina:document.getElementById('f_maquina').value.trim(),ing:document.getElementById('f_ing').value.trim(),
+    notas:document.getElementById('f_notas').value.trim(),
+  };
+  if(editId){const i=piezas.findIndex(x=>x.id===editId);piezas[i]=o;}else piezas.push(o);
+  save();closeModal('modalInv');renderInv();
+  toast(editId?'Pieza actualizada.':'Pieza agregada.','ok');
+}
+function deletePieza(id){
+  if(!confirm('¿Eliminar esta pieza?'))return;
+  piezas=piezas.filter(p=>p.id!==id);save();renderInv();
+  toast('Pieza eliminada.','warn');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DETALLE
+// ═══════════════════════════════════════════════════════════════
+function verDetalle(id){
+  const p=piezas.find(x=>x.id===id);if(!p)return;
+  document.getElementById('detalleTitle').textContent=`${p.pn} – ${p.desc}`;
+  const rows=[
+    ['Part Number',`<span style="font-family:var(--mono);color:var(--blue)">${p.pn}</span>`],
+    ['Serial Number',p.sn||'—'],['Descripción',p.desc],['Ubicación',p.ubic],
+    ['Estado',SB[p.estado]||p.estado],
+    ['Cantidad',`<span style="font-family:var(--mono);font-size:14px;font-weight:600">${p.cantidad||0}</span>`],
+    ['Llegada NL',fmtDate(p.llegada)],['Fecha de Uso',fmtDate(p.uso)],
+    ['Fecha Envío JAL',fmtDate(p.envioJal)],
+    ['Guía MTY→JAL',p.guiaMTY?`<span style="font-family:var(--mono);color:var(--blue)">${p.guiaMTY}</span>`:'—'],
+    ['Guía JAL→MTY',p.guiaJAL?`<span style="font-family:var(--mono);color:var(--blue)">${p.guiaJAL}</span>`:'—'],
+    ['Orden de Servicio',p.os?`<span style="font-family:var(--mono);color:var(--green)">${p.os}</span>`:'<span style="color:var(--red)">No registrada</span>'],
+    ['Empresa',p.empresa||'—'],['Máquina / Equipo',p.maquina||'—'],
+    ['Ingeniero',p.ing||'—'],['Notas',p.notas||'—'],
+  ];
+  const hp=historial.filter(h=>h.pn===p.pn);
+  document.getElementById('detalleBody').innerHTML=
+    rows.map(([l,v])=>`<div class="detail-row"><span class="detail-label">${l}</span><span class="detail-value">${v}</span></div>`).join('')+
+    (hp.length?`<hr style="border-color:var(--border);margin:14px 0"/>
+    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Historial de esta pieza</div>
+    ${hp.sort((a,b)=>b.fecha.localeCompare(a.fecha)).map(h=>`
+      <div class="hist-item" style="padding:8px 0">
+        <div class="hist-dot" style="background:${eC(h.evento)}"></div>
+        <div><div class="hist-event">${h.evento}</div>
+        <div class="hist-meta">${fmtDate(h.fecha)}${h.guia?' · '+h.guia:''}${h.os?' · '+h.os:''}</div>
+        ${h.notas?`<div class="hist-detail">${h.notas}</div>`:''}</div>
+      </div>`).join('')}`:'');
+  document.getElementById('modalDetalle').classList.add('open');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HISTORIAL
+// ═══════════════════════════════════════════════════════════════
+const EC={'Recepción en NL':'#3fb950','Asignación a Orden':'#d29922','Instalación en Equipo':'#d29922','Extracción de Equipo (Dañada)':'#f85149','Envío MTY→JAL':'#e3b341','Recepción en JAL':'#58a6ff','Envío JAL→MTY':'#58a6ff','Baja / Descarte':'#656d76'};
+function eC(e){return EC[e]||'#8b949e';}
+
+function renderHistorial(){
+  const q=document.getElementById('searchHist').value.toLowerCase();
+  const fp=document.getElementById('filterHistPN').value;
+  const fe=document.getElementById('filterHistEvento').value;
+  const pns=[...new Set(historial.map(h=>h.pn))].sort();
+  const sel=document.getElementById('filterHistPN');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">Todos los PN</option>'+pns.map(p=>`<option${p===cur?' selected':''}>${p}</option>`).join('');
+  let data=[...historial].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  if(fp) data=data.filter(h=>h.pn===fp);
+  if(fe) data=data.filter(h=>h.evento===fe);
+  if(q)  data=data.filter(h=>JSON.stringify(h).toLowerCase().includes(q));
+  const c=document.getElementById('histList');
+  if(!data.length){c.innerHTML=`<div class="empty-state"><div class="icon">📋</div><p>Sin registros.</p></div>`;return;}
+  c.innerHTML=data.map(h=>`
+    <div class="hist-item">
+      <div class="hist-dot" style="background:${eC(h.evento)}"></div>
+      <div style="flex:1">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span class="hist-event">${h.evento}</span>
+          <span style="font-family:var(--mono);font-size:11px;color:var(--blue)">${h.pn}</span>
+          ${h.sn&&h.sn!=='N/A'?`<span style="font-family:var(--mono);font-size:11px;color:var(--text3)">${h.sn}</span>`:''}
+        </div>
+        <div class="hist-meta">${fmtDate(h.fecha)}${h.os?' · <span style="color:var(--green)">'+h.os+'</span>':''}${h.guia?' · '+h.guia:''}${h.origen&&h.destino?' · '+h.origen+'→'+h.destino:''}${h.empresa?' · '+h.empresa:''}${h.ing?' · '+h.ing:''}</div>
+        ${h.notas?`<div class="hist-detail">${h.notas}</div>`:''}
+      </div>
+      <button class="btn-danger" style="align-self:center" onclick="deleteHist(${h.id})">🗑</button>
+    </div>`).join('');
+}
+function deleteHist(id){if(!confirm('¿Eliminar?'))return;historial=historial.filter(h=>h.id!==id);save();renderHistorial();toast('Eliminado.','warn');}
+function openModalHist(){
+  const pns=[...new Set(piezas.map(p=>p.pn))].sort();
+  document.getElementById('h_pn').innerHTML=pns.map(p=>`<option>${p}</option>`).join('');
+  document.getElementById('h_fecha').value=new Date().toISOString().split('T')[0];
+  ['h_os','h_guia','h_empresa','h_maquina','h_ing','h_notas','h_sn'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  const pnEl=document.getElementById('h_pn');
+  const fillSN=()=>{const p=piezas.find(x=>x.pn===pnEl.value);if(p)document.getElementById('h_sn').value=p.sn||'';};
+  pnEl.onchange=fillSN;fillSN();
+  document.getElementById('modalHist').classList.add('open');
+}
+function saveMovimiento(){
+  const fecha=document.getElementById('h_fecha').value,pn=document.getElementById('h_pn').value,evento=document.getElementById('h_evento').value;
+  if(!fecha||!pn||!evento){toast('Fecha, PN y Evento son obligatorios.','err');return;}
+  historial.push({id:Date.now(),fecha,pn,sn:document.getElementById('h_sn').value,evento,
+    os:document.getElementById('h_os').value.trim(),guia:document.getElementById('h_guia').value.trim(),
+    empresa:document.getElementById('h_empresa').value.trim(),maquina:document.getElementById('h_maquina').value.trim(),
+    origen:document.getElementById('h_origen').value,destino:document.getElementById('h_destino').value,
+    ing:document.getElementById('h_ing').value.trim(),notas:document.getElementById('h_notas').value.trim()});
+  save();closeModal('modalHist');renderHistorial();toast('Movimiento registrado.','ok');
+}
+['searchHist','filterHistPN','filterHistEvento'].forEach(id=>{
+  const e=document.getElementById(id);e.addEventListener('input',renderHistorial);e.addEventListener('change',renderHistorial);
+});
+
+// ═══════════════════════════════════════════════════════════════
+// CATÁLOGO
+// ═══════════════════════════════════════════════════════════════
+function renderCatalogo(){
+  const q=document.getElementById('searchCat').value.toLowerCase();
+  let data=catalogo.filter(c=>!q||[c.pn,c.desc,c.fab,c.equipo].join(' ').toLowerCase().includes(q));
+  const tb=document.getElementById('catBody');
+  if(!data.length){tb.innerHTML=`<tr><td colspan="9"><div class="empty-state"><div class="icon">🔧</div><p>Catálogo vacío.</p></div></td></tr>`;return;}
+  tb.innerHTML=data.map(c=>{
+    const d=dispByPN(c.pn);
+    const sc=d===0?'var(--red)':d<c.stock?'var(--yellow)':'var(--green)';
+    return `<tr>
+      <td class="mono" style="color:var(--blue)">${c.pn}</td>
+      <td>${c.desc}</td><td style="color:var(--text2)">${c.fab}</td>
+      <td style="color:var(--text2);font-size:11px">${c.equipo}</td>
+      <td style="text-align:center">${c.sn==='Sí'?'✅':'—'}</td>
+      <td style="text-align:center;font-family:var(--mono);color:var(--text3)">${c.stock}</td>
+      <td style="text-align:center;font-family:var(--mono);color:${sc};font-weight:600">${d}</td>
+      <td class="wrap">${c.notas}</td>
+      <td><button class="btn-danger" onclick="deleteCat('${c.pn}')">🗑</button></td>
+    </tr>`;
+  }).join('');
+}
+function openModalCat(){
+  ['c_pn','c_fab','c_desc','c_equipo','c_notas'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('c_stock').value='1';document.getElementById('c_sn').value='No';
+  document.getElementById('modalCat').classList.add('open');
+}
+function saveCatalogo(){
+  const pn=document.getElementById('c_pn').value.trim(),desc=document.getElementById('c_desc').value.trim();
+  if(!pn||!desc){toast('Part Number y Descripción son obligatorios.','err');return;}
+  if(catalogo.find(c=>c.pn===pn)){toast('Ese PN ya existe en el catálogo.','warn');return;}
+  catalogo.push({pn,desc,fab:document.getElementById('c_fab').value.trim(),equipo:document.getElementById('c_equipo').value.trim(),
+    sn:document.getElementById('c_sn').value,stock:parseInt(document.getElementById('c_stock').value)||1,
+    notas:document.getElementById('c_notas').value.trim()});
+  save();closeModal('modalCat');renderCatalogo();toast('Agregado al catálogo.','ok');
+}
+function deleteCat(pn){if(!confirm('¿Eliminar?'))return;catalogo=catalogo.filter(c=>c.pn!==pn);save();renderCatalogo();toast('Eliminado.','warn');}
+document.getElementById('searchCat').addEventListener('input',renderCatalogo);
+
+// ═══════════════════════════════════════════════════════════════
+// EXPORT CSV
+// ═══════════════════════════════════════════════════════════════
+function exportCSV(w){
+  let H,R,fn;
+  if(w==='inv'){
+    H=['Part Number','Serial Number','Descripcion','Ubicacion','Estado','Cantidad','Llegada NL','Fecha Uso','Envio JAL','Guia MTY-JAL','Guia JAL-MTY','Orden de Servicio','Empresa','Maquina','Ingeniero','Notas'];
+    R=piezas.map(p=>[p.pn,p.sn,p.desc,p.ubic,p.estado,p.cantidad||0,fmtDate(p.llegada),fmtDate(p.uso),fmtDate(p.envioJal),p.guiaMTY,p.guiaJAL,p.os,p.empresa,p.maquina,p.ing,p.notas]);
+    fn='inventario';
+  }else{
+    H=['Fecha','Part Number','Serial Number','Evento','Orden de Servicio','Guia','Empresa','Maquina','Origen','Destino','Ingeniero','Notas'];
+    R=[...historial].sort((a,b)=>b.fecha.localeCompare(a.fecha)).map(h=>[fmtDate(h.fecha),h.pn,h.sn,h.evento,h.os,h.guia,h.empresa,h.maquina,h.origen,h.destino,h.ing,h.notas]);
+    fn='historial';
+  }
+  const csv=[H.join(','),...R.map(r=>r.map(v=>`"${(v||'').toString().replace(/"/g,'""')}"`).join(','))].join('\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent('\ufeff'+csv);
+  a.download=`spare_part_${fn}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  toast(`CSV de ${fn} descargado.`,'ok');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// IMPORT EXCEL — reads exact headers from Plantilla_Spare_Part_SMT.xlsx
+// ═══════════════════════════════════════════════════════════════
+let importWB=null;
+const zone=document.getElementById('importZone');
+zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('dragover');});
+zone.addEventListener('dragleave',()=>zone.classList.remove('dragover'));
+zone.addEventListener('drop',e=>{
+  e.preventDefault();zone.classList.remove('dragover');
+  const f=e.dataTransfer.files[0];
+  if(f&&(f.name.endsWith('.xlsx')||f.name.endsWith('.xls')))handleXLSX(f);
+  else toast('Selecciona un .xlsx o .xls','err');
+});
+document.getElementById('xlsxInput').addEventListener('change',function(){if(this.files[0])handleXLSX(this.files[0]);this.value='';});
+
+function handleXLSX(file){
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      importWB=XLSX.read(e.target.result,{type:'binary',cellDates:false,raw:true});
+      document.getElementById('importFileName').textContent=file.name;
+      document.getElementById('importOptions').innerHTML=importWB.SheetNames.map((n,i)=>`
+        <div class="import-option${i===0?' selected':''}" data-sheet="${n}" onclick="selSheet(this)">
+          <div class="import-option-icon">${shIcon(n)}</div>
+          <div><div class="import-option-title">${n}</div><div class="import-option-sub">${shType(n)}</div></div>
+        </div>`).join('');
+      document.getElementById('modalImport').classList.add('open');
+    }catch(err){toast('Error al leer el archivo: '+err.message,'err');}
+  };
+  r.readAsBinaryString(file);
+}
+function shType(n){const l=n.toLowerCase();if(l==='inventario')return 'Inventario de piezas';if(l==='historial')return 'Historial de movimientos';if(l==='catalogo'||l==='catálogo')return 'Catálogo de Part Numbers';return 'Hoja de datos';}
+function shIcon(n){const l=n.toLowerCase();if(l==='inventario')return '📦';if(l==='historial')return '📋';if(l==='catalogo'||l==='catálogo')return '🔧';return '📄';}
+function selSheet(el){document.querySelectorAll('.import-option').forEach(x=>x.classList.remove('selected'));el.classList.add('selected');}
+
+// Convert Excel serial number to YYYY-MM-DD
+function xlDateToISO(v){
+  if(!v&&v!==0)return '';
+  if(typeof v==='number'&&v>1000){
+    // Excel date serial
+    const d=new Date(Math.round((v-25569)*86400*1000));
+    return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0');
+  }
+  const s=String(v).trim();
+  const dm=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(dm)return `${dm[3]}-${dm[2].padStart(2,'0')}-${dm[1].padStart(2,'0')}`;
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;
+  return '';
+}
+function str(v){return v!==undefined&&v!==null?String(v).trim():'';}
+
+function doImport(){
+  if(!importWB){toast('No hay archivo.','err');return;}
+  const sel=document.querySelector('.import-option.selected');
+  if(!sel){toast('Selecciona una hoja.','err');return;}
+  const sheetName=sel.dataset.sheet;
+  const mode=document.querySelector('input[name="importMode"]:checked').value;
+  // Use header:1 to get raw arrays, then map manually
+  const ws=importWB.Sheets[sheetName];
+  const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+  if(raw.length<2){toast('La hoja está vacía o solo tiene encabezados.','warn');return;}
+  const headers=raw[0].map(h=>String(h).trim());
+  const rows=raw.slice(1).filter(r=>r.some(c=>c!==''));
+
+  function col(row,name){const i=headers.indexOf(name);return i>=0?row[i]:'';}
+
+  const snL=sheetName.toLowerCase();
+  let type='inv';
+  if(snL==='historial') type='hist';
+  else if(snL==='catalogo'||snL==='catálogo') type='cat';
+
+  let count=0;
+  if(type==='inv'){
+    const imp=rows.map((r,i)=>{
+      const pn=str(col(r,'Part Number'));if(!pn)return null;
+      return{id:Date.now()+i,pn,sn:str(col(r,'Serial Number')),desc:str(col(r,'Descripcion')),
+        ubic:str(col(r,'Ubicacion'))||'NL',estado:str(col(r,'Estado'))||'Disponible',
+        cantidad:parseInt(col(r,'Cantidad'))||0,
+        llegada:xlDateToISO(col(r,'Llegada NL')),uso:xlDateToISO(col(r,'Fecha Uso')),
+        envioJal:xlDateToISO(col(r,'Envio JAL')),
+        guiaMTY:str(col(r,'Guia MTY-JAL')),guiaJAL:str(col(r,'Guia JAL-MTY')),
+        os:str(col(r,'Orden de Servicio')),empresa:str(col(r,'Empresa')),
+        maquina:str(col(r,'Maquina')),ing:str(col(r,'Ingeniero')),notas:str(col(r,'Notas'))};
+    }).filter(Boolean);
+    count=imp.length;
+    if(mode==='replace')piezas=imp;
+    else piezas=[...piezas,...imp.filter(ni=>!piezas.find(p=>p.pn===ni.pn&&p.sn===ni.sn))];
+    save();renderInv();
+  }else if(type==='hist'){
+    const imp=rows.map((r,i)=>{
+      const pn=str(col(r,'Part Number'));if(!pn)return null;
+      return{id:Date.now()+i,fecha:xlDateToISO(col(r,'Fecha'))||str(col(r,'Fecha')),
+        pn,sn:str(col(r,'Serial Number')),evento:str(col(r,'Evento')),
+        os:str(col(r,'Orden de Servicio')),guia:str(col(r,'Guia')),
+        empresa:str(col(r,'Empresa')),maquina:str(col(r,'Maquina')),
+        origen:str(col(r,'Origen')),destino:str(col(r,'Destino')),
+        ing:str(col(r,'Ingeniero')),notas:str(col(r,'Notas'))};
+    }).filter(Boolean);
+    count=imp.length;
+    if(mode==='replace')historial=imp;else historial=[...historial,...imp];
+    save();renderHistorial();
+  }else{
+    const imp=rows.map(r=>{
+      const pn=str(col(r,'Part Number'));if(!pn)return null;
+      return{pn,desc:str(col(r,'Descripcion')),fab:str(col(r,'Fabricante')),
+        equipo:str(col(r,'Equipo Compatible')),sn:str(col(r,'Requiere SN'))||'No',
+        stock:parseInt(col(r,'Stock Min NL'))||1,notas:str(col(r,'Notas'))};
+    }).filter(Boolean);
+    count=imp.length;
+    if(mode==='replace')catalogo=imp;
+    else imp.forEach(ni=>{if(!catalogo.find(c=>c.pn===ni.pn))catalogo.push(ni);});
+    save();renderCatalogo();
+  }
+  closeModal('modalImport');
+  const tl={inv:'Inventario',hist:'Historial',cat:'Catálogo'}[type];
+  toast(`✅ ${count} registros importados a ${tl} (${mode==='replace'?'reemplazado':'fusionado'}).`,'ok');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MODAL HELPERS
+// ═══════════════════════════════════════════════════════════════
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+document.querySelectorAll('.modal-overlay').forEach(m=>{
+  m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');});
+});
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+document.getElementById('headerDate').textContent=
+  new Date().toLocaleDateString('es-MX',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+// Setup Google Sheets state
+if(GS_URL){
+  setSyncStatus('ok','Conectado');
+  pullFromCloud(); // auto-sync on load
+}else{
+  setSyncStatus('','Sin conexión');
+  document.getElementById('setupBanner').style.display='';
+}
+
+renderInv();
+</script>
+</body>
+</html>
